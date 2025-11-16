@@ -34,7 +34,7 @@ Click on "Developer Settings"
 Choose the following scopes for your PAT:
 
 <p align="left">
-  <img src="pictures/gh-pk-pat-scope-1.png" width="30%" height="30%" title="gh-pk-pat-scope-1">
+  <img src="pictures/gh-pk-pat-scope-1.png" width="60%" height="60%" title="gh-pk-pat-scope-1">
 </p>
 
 <p align="left">
