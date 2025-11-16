@@ -9,7 +9,7 @@ This Terraform example automates creation and basic configuration of a GitHub re
  * Typical workflow: set the environment variable, run terraform init, then terraform plan and terraform apply to create the repository.
  * Caveat: Keep only one non-aliased provider and one required_providers block in the module root to avoid duplicate-configuration errors.
 
-# How to create a new GitHub repository using Terraform
+# Deploy a new GitHub repository using Terraform
 
 ## Prepare the parametrization files
 
@@ -25,11 +25,27 @@ Click on your profile in the right upper corner and choose "Settings"
   <img src="pictures/gh-pk-settings.png" width="30%" height="30%" title="gh-pk-settings">
 </p>
 
+Click on "Developer Settings"
+
 <p align="left">
   <img src="pictures/gh-pk-dev-settings.png" width="30%" height="30%" title="gh-pk-dev-settings">
 </p>
 
+Choose the following scopes for your PAT:
+
+<p align="left">
+  <img src="pictures/gh-pk-pat-scope-1.png" width="30%" height="30%" title="gh-pk-pat-scope-1">
+</p>
+
+<p align="left">
+  <img src="pictures/gh-pk-pat-scope-2.png" width="70%" height="70%" title="gh-pk-pat-scope-2">
+</p>
+
+Create the PAT and copy the value of it.
+
 ## Set the environment variable
+
+Set the value of the previously created value by starting a new bash prompt and set it like:
 
 ```bash
 export TF_VAR_github_token="your_token_here"
@@ -47,3 +63,24 @@ terraform init
 ```bash
 terraform validate
 ```
+
+## Create an execution plan
+
+```bash
+terraform plan -out tfplan
+```
+
+## Apply using the created plan
+
+```bash
+terraform apply tfplan
+```
+The repository should be created.
+
+# Destroy the GitHub repository
+
+```bash
+terraform destroy
+```
+
+Verify the logs and confirm it with "yes"
