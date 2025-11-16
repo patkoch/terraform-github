@@ -1,0 +1,13 @@
+# GitHub owner (user oder org)
+github_owner = "patkoch"
+
+# Name des zu erstellenden Repos
+repository_name = "tf-auto-repo"
+
+description = "An automated created repository via Terraform"
+visibility  = "public" # public | private | internal
+
+auto_init = true
+
+# Hinweis: Do NOT enter the value of the  github_token in plain text here 
+# --> Set the environment variable TF_VAR_github_token ínstead!
