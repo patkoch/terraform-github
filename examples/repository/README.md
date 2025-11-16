@@ -15,6 +15,7 @@ This Terraform example automates creation and basic configuration of a GitHub re
 
  * Rename "examples/repository/terraform.tfvars.example" to "examples/repository/terraform.tfvars"
  * Set your GitHub owner inb line 2 of the terraform.tfvars file
+ * Set the name of the GitHub repository to be created in line 5
 
 ## Create a proper Personal Access token
 
@@ -22,6 +23,10 @@ Click on your profile in the right upper corner and choose "Settings"
 
 <p align="left">
   <img src="pictures/gh-pk-settings.png" width="30%" height="30%" title="gh-pk-settings">
+</p>
+
+<p align="left">
+  <img src="pictures/gh-pk-dev-settings.png" width="30%" height="30%" title="gh-pk-dev-settings">
 </p>
 
 ## Set the environment variable
