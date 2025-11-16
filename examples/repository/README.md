@@ -9,7 +9,36 @@ This Terraform example automates creation and basic configuration of a GitHub re
  * Typical workflow: set the environment variable, run terraform init, then terraform plan and terraform apply to create the repository.
  * Caveat: Keep only one non-aliased provider and one required_providers block in the module root to avoid duplicate-configuration errors.
 
- ## Set the environment variable
+# How to create a new GitHub repository using Terraform
+
+## Prepare the parametrization files
+
+ * Rename "examples/repository/terraform.tfvars.example" to "examples/repository/terraform.tfvars"
+ * Set your GitHub owner inb line 2 of the terraform.tfvars file
+
+## Create a proper Personal Access token
+
+Click on your profile in the right upper corner and choose "Settings"
+
+<p align="left">
+  <img src="pictures/gh-pk-settings.png" width="100%" height="100%" title="gh-pk-settings">
+</p>
+
+## Set the environment variable
 
 ```bash
 export TF_VAR_github_token="your_token_here"
+```
+
+
+## Initialize the working direcotory
+
+```bash
+terraform init
+```
+
+## Validate it
+
+```bash
+terraform validate
+```
