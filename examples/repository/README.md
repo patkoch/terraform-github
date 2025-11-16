@@ -21,7 +21,7 @@ This Terraform example automates creation and basic configuration of a GitHub re
 Click on your profile in the right upper corner and choose "Settings"
 
 <p align="left">
-  <img src="pictures/gh-pk-settings.png" width="100%" height="100%" title="gh-pk-settings">
+  <img src="pictures/gh-pk-settings.png" width="50%" height="50%" title="gh-pk-settings">
 </p>
 
 ## Set the environment variable
