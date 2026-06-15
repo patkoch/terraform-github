@@ -46,9 +46,3 @@ variable "auto_init" {
   type        = bool
   default     = false
 }
-
-variable "default_branch" {
-  description = "Default branch name to set for the repository (e.g., main)."
-  type        = string
-  default     = "main"
-}
