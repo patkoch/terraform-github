@@ -9,3 +9,9 @@ override.tf.json
 # local tfvars that may contain secrets
 terraform.tfvars
 terraform.tfvars.json
+
+# Python local development
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/

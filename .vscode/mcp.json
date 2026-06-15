@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "terraform-versions": {
+      "type": "stdio",
+      "command": "${workspaceFolder}/mcp-server/.venv/bin/python",
+      "args": [
+        "-m",
+        "terraform_versions_mcp.server"
+      ],
+      "cwd": "${workspaceFolder}/mcp-server"
+    }
+  }
+}

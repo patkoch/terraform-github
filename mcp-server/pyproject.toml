@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terraform-versions-mcp"
+version = "0.1.0"
+description = "MCP server that returns the latest Terraform CLI and GitHub provider versions."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp[cli]>=1.27,<2",
+]
+
+[project.scripts]
+terraform-versions-mcp = "terraform_versions_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
