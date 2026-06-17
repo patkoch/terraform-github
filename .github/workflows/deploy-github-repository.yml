@@ -1,0 +1,323 @@
+name: Deploy GitHub Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Action to perform
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - destroy
+      github_owner:
+        description: GitHub user or organization where the repository will be created
+        required: true
+        default: patkoch
+        type: string
+      repository_name:
+        description: Name of the repository to create
+        required: true
+        default: tf-auto-repo
+        type: string
+      description:
+        description: Repository description
+        required: false
+        default: An automated created repository via Terraform
+        type: string
+      visibility:
+        description: Repository visibility
+        required: true
+        default: public
+        type: choice
+        options:
+          - public
+          - private
+          - internal
+      auto_init:
+        description: Initialize the repository with an empty README
+        required: true
+        default: true
+        type: boolean
+      has_issues:
+        description: Enable GitHub Issues
+        required: true
+        default: true
+        type: boolean
+      has_wiki:
+        description: Enable GitHub Wiki
+        required: true
+        default: false
+        type: boolean
+      has_projects:
+        description: Enable GitHub Projects
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+  TF_WORKING_DIR: examples/repository
+  TERRAFORM_VERSION: 1.15.6
+  ARM_SUBSCRIPTION_ID: ff676f41-96fb-4d4e-80a8-e8a7d6ccd42e
+  ARM_USE_AZUREAD: true
+  ARM_USE_OIDC: true
+  TF_STATE_RESOURCE_GROUP_NAME: azureworkshop-demo-rg
+  TF_STATE_STORAGE_ACCOUNT_NAME: stdemodevsdc001
+  TF_STATE_CONTAINER_NAME: tfstate
+
+jobs:
+  plan:
+    name: TFLint, format, validate and plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.github_owner }}
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - name: Ensure Terraform state container exists
+        run: |
+          az storage container create \
+            --auth-mode login \
+            --account-name "$TF_STATE_STORAGE_ACCOUNT_NAME" \
+            --name "$TF_STATE_CONTAINER_NAME" \
+            --only-show-errors
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Write Terraform variables
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_GITHUB_OWNER: ${{ inputs.github_owner }}
+          TF_VAR_REPOSITORY_NAME: ${{ inputs.repository_name }}
+          TF_VAR_DESCRIPTION: ${{ inputs.description }}
+          TF_VAR_VISIBILITY: ${{ inputs.visibility }}
+          TF_VAR_AUTO_INIT: ${{ inputs.auto_init }}
+          TF_VAR_HAS_ISSUES: ${{ inputs.has_issues }}
+          TF_VAR_HAS_WIKI: ${{ inputs.has_wiki }}
+          TF_VAR_HAS_PROJECTS: ${{ inputs.has_projects }}
+        run: |
+          jq -n \
+            --arg github_owner "$TF_VAR_GITHUB_OWNER" \
+            --arg repository_name "$TF_VAR_REPOSITORY_NAME" \
+            --arg description "$TF_VAR_DESCRIPTION" \
+            --arg visibility "$TF_VAR_VISIBILITY" \
+            --argjson auto_init "$TF_VAR_AUTO_INIT" \
+            --argjson has_issues "$TF_VAR_HAS_ISSUES" \
+            --argjson has_wiki "$TF_VAR_HAS_WIKI" \
+            --argjson has_projects "$TF_VAR_HAS_PROJECTS" \
+            '{
+              github_owner: $github_owner,
+              repository_name: $repository_name,
+              description: $description,
+              visibility: $visibility,
+              auto_init: $auto_init,
+              has_issues: $has_issues,
+              has_wiki: $has_wiki,
+              has_projects: $has_projects
+            }' > terraform.auto.tfvars.json
+
+      - name: Write Terraform backend configuration
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          cat > backend.generated.tf <<EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "$TF_STATE_RESOURCE_GROUP_NAME"
+              storage_account_name = "$TF_STATE_STORAGE_ACCOUNT_NAME"
+              container_name       = "$TF_STATE_CONTAINER_NAME"
+              key                  = "terraform-github-repository.tfstate"
+              subscription_id      = "$ARM_SUBSCRIPTION_ID"
+              use_azuread_auth     = true
+            }
+          }
+          EOF
+
+      - name: Run TFLint
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          tflint --init
+          tflint --format=compact
+
+      - name: Terraform format check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: terraform validate
+
+      - name: Terraform plan deploy
+        if: inputs.action == 'deploy'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: terraform plan -out=tfplan -input=false
+
+      - name: Terraform plan destroy
+        if: inputs.action == 'destroy'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: terraform plan -destroy -out=tfplan -input=false
+
+      - name: Upload Terraform plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-repository-tfplan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 1
+          if-no-files-found: error
+
+  apply:
+    name: Manual approval and apply
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: approver
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.github_owner }}
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - name: Ensure Terraform state container exists
+        run: |
+          az storage container create \
+            --auth-mode login \
+            --account-name "$TF_STATE_STORAGE_ACCOUNT_NAME" \
+            --name "$TF_STATE_CONTAINER_NAME" \
+            --only-show-errors
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Download Terraform plan
+        uses: actions/download-artifact@v4
+        with:
+          name: github-repository-tfplan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Write Terraform variables
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_GITHUB_OWNER: ${{ inputs.github_owner }}
+          TF_VAR_REPOSITORY_NAME: ${{ inputs.repository_name }}
+          TF_VAR_DESCRIPTION: ${{ inputs.description }}
+          TF_VAR_VISIBILITY: ${{ inputs.visibility }}
+          TF_VAR_AUTO_INIT: ${{ inputs.auto_init }}
+          TF_VAR_HAS_ISSUES: ${{ inputs.has_issues }}
+          TF_VAR_HAS_WIKI: ${{ inputs.has_wiki }}
+          TF_VAR_HAS_PROJECTS: ${{ inputs.has_projects }}
+        run: |
+          jq -n \
+            --arg github_owner "$TF_VAR_GITHUB_OWNER" \
+            --arg repository_name "$TF_VAR_REPOSITORY_NAME" \
+            --arg description "$TF_VAR_DESCRIPTION" \
+            --arg visibility "$TF_VAR_VISIBILITY" \
+            --argjson auto_init "$TF_VAR_AUTO_INIT" \
+            --argjson has_issues "$TF_VAR_HAS_ISSUES" \
+            --argjson has_wiki "$TF_VAR_HAS_WIKI" \
+            --argjson has_projects "$TF_VAR_HAS_PROJECTS" \
+            '{
+              github_owner: $github_owner,
+              repository_name: $repository_name,
+              description: $description,
+              visibility: $visibility,
+              auto_init: $auto_init,
+              has_issues: $has_issues,
+              has_wiki: $has_wiki,
+              has_projects: $has_projects
+            }' > terraform.auto.tfvars.json
+
+      - name: Write Terraform backend configuration
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          cat > backend.generated.tf <<EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "$TF_STATE_RESOURCE_GROUP_NAME"
+              storage_account_name = "$TF_STATE_STORAGE_ACCOUNT_NAME"
+              container_name       = "$TF_STATE_CONTAINER_NAME"
+              key                  = "terraform-github-repository.tfstate"
+              subscription_id      = "$ARM_SUBSCRIPTION_ID"
+              use_azuread_auth     = true
+            }
+          }
+          EOF
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: terraform init
+
+      - name: Terraform apply selected plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: terraform apply -auto-approve -input=false tfplan
