@@ -1,9 +1,11 @@
 .terraform/
 *.tfstate
 *.tfstate.*
+tfplan
 crash.log
 override.tf
 override.tf.json
+backend.generated.tf
 .terraform.lock.hcl
 
 # local tfvars that may contain secrets

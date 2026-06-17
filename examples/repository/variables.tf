@@ -1,9 +1,3 @@
-variable "github_token" {
-  description = "GitHub personal access token with 'repo' scope (sensitive). You can set it via TF_VAR_github_token"
-  type        = string
-  sensitive   = true
-}
-
 variable "github_owner" {
   description = "GitHub owner (user or organization) where the repo will be created."
   type        = string
